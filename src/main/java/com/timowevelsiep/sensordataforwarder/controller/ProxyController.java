@@ -1,5 +1,6 @@
 package com.timowevelsiep.sensordataforwarder.controller;
 
+import com.timowevelsiep.sensordataforwarder.AsyncService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
@@ -18,11 +19,11 @@ public class ProxyController {
     @Autowired
     private RestTemplate restTemplate;
 
+    @Autowired
+    private AsyncService asyncService;
+
     @Value("${main.backend.url}")
     private String mainBackendUrl;
-
-    @Value("${secondary.backend.url}")
-    private String secondaryBackendUrl;
 
     @RequestMapping("/**")
     public ResponseEntity<String> proxyRequest(HttpServletRequest request, @RequestBody(required = false) String body) throws IOException {
@@ -38,12 +39,11 @@ public class ProxyController {
         HttpEntity<String> entity = new HttpEntity<>(body, headers);
         ResponseEntity<String> response = restTemplate.postForEntity(mainBackendUrl + path, entity, String.class);
 
-        // Weiterleitung an das sekundäre Backend, ohne auf die Antwort zu warten
-        new Thread(() -> restTemplate.postForEntity(secondaryBackendUrl + path, entity, String.class)).start();
+        // Asynchrone Weiterleitung an das sekundäre Backend
+        asyncService.forwardToSecondaryBackend(path, entity);
 
         // Loggen der Antwort
         System.out.println("Response: " + response.getBody());
-
 
         return response;
     }
